@@ -1,0 +1,142 @@
+Options -Indexes
+
+# Explicit so the retained _old_index.php (the previous Laravel front
+# controller, kept on disk as a rollback path) can never win the directory
+# index and boot the old application.
+DirectoryIndex index.html
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # ---------- Force HTTPS ----------
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+    # ---------- Legacy URLs from the previous Laravel site ----------
+    # These paths existed on the old site but have no equivalent in this
+    # build. Redirecting (rather than letting them 404) preserves whatever
+    # link equity and bookmarks they had.
+    RewriteRule ^listing/?$ /projects [R=301,L]
+    # ---------- LEGACYMAP: full old-site URL surface ----------
+    # Old agent profiles were broker/partner pages, so /broker is a closer
+    # topical match than the homepage they were previously sent to.
+    RewriteRule ^agents(/.*)?$ /broker [R=301,L]
+    RewriteRule ^become/agent/?$ /broker [R=301,L]
+    RewriteRule ^property-create/?$ /broker [R=301,L]
+
+    # Old project detail pages. The two projects that still exist have their
+    # own serve rules below, so they are excluded here.
+    RewriteRule ^projects/(?!township/?$|bonito/?$)[^/]+/?$ /projects [R=301,L]
+
+    # Property detail pages, the old listing index, and the invest section
+    # all map onto the new portfolio page.
+    RewriteRule ^property/[^/]+/?$ /projects [R=301,L]
+    RewriteRule ^listing/.+$ /projects [R=301,L]
+    RewriteRule ^invest-properties/?$ /projects [R=301,L]
+
+    # Old blog: taxonomy routes first, then individual posts, then search.
+    RewriteRule ^blog/(category|tag|archive)/.*$ /blogs [R=301,L]
+    RewriteRule ^blog/[^/]+/?$ /blogs [R=301,L]
+    RewriteRule ^blog-search/?$ /blogs [R=301,L]
+    RewriteRule ^blogs/.+$ /blogs [R=301,L]
+
+    # Routes with no counterpart in the new build.
+    RewriteRule ^(plans|faq)/?$ / [R=301,L]
+    RewriteRule ^(under-maintenance|finalize)/?$ / [R=301,L]
+    RewriteRule ^(currency|language)/[^/]+/?$ / [R=301,L]
+    # ---------- end LEGACYMAP ----------
+    RewriteRule ^privacy/?$ /privacy-policy [R=301,L]
+
+    # ---------- Canonicalize: real .html file -> clean URL ----------
+    RewriteCond %{THE_REQUEST} /index\.html[\s?] [NC]
+    RewriteRule ^index\.html$ / [R=301,L]
+
+    RewriteCond %{THE_REQUEST} /about\.html[\s?] [NC]
+    RewriteRule ^about\.html$ /about-us [R=301,L]
+
+    RewriteCond %{THE_REQUEST} /bonito\.html[\s?] [NC]
+    RewriteRule ^bonito\.html$ /projects/bonito [R=301,L]
+
+    RewriteCond %{THE_REQUEST} /township\.html[\s?] [NC]
+    RewriteRule ^township\.html$ /projects/township [R=301,L]
+
+    RewriteCond %{THE_REQUEST} /(projects|blogs|contact|broker|book-meeting|terms-and-conditions|privacy-policy)\.html[\s?] [NC]
+    RewriteRule ^(projects|blogs|contact|broker|book-meeting|terms-and-conditions|privacy-policy)\.html$ /$1 [R=301,L]
+
+    # ---------- Serve the matching .html for each clean URL ----------
+    # The files themselves stay flat; project detail pages just present
+    # under /projects/ in the address bar.
+    RewriteRule ^about-us/?$ about.html [L]
+    RewriteRule ^projects/bonito/?$ bonito.html [L]
+    RewriteRule ^projects/township/?$ township.html [L]
+    RewriteRule ^projects/?$ projects.html [L]
+    RewriteRule ^blogs/?$ blogs.html [L]
+    RewriteRule ^contact/?$ contact.html [L]
+    RewriteRule ^broker/?$ broker.html [L]
+    RewriteRule ^book-meeting/?$ book-meeting.html [L]
+    RewriteRule ^terms-and-conditions/?$ terms-and-conditions.html [L]
+    RewriteRule ^privacy-policy/?$ privacy-policy.html [L]
+</IfModule>
+
+ErrorDocument 404 /404.html
+
+# ---------- Block the retained previous site ----------
+# The old Laravel install is kept on disk (renamed _old_*) purely as a
+# rollback path. Nothing in it should be reachable over HTTP -- especially
+# _old_project/.env, which holds database credentials.
+<IfModule mod_rewrite.c>
+    RewriteRule ^_old_ - [F,L]
+</IfModule>
+<FilesMatch "^\.env">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript text/javascript application/xml text/xml image/svg+xml
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/html "access plus 0 seconds"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType video/mp4 "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType text/javascript "access plus 1 month"
+    ExpiresByType image/x-icon "access plus 1 year"
+</IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(webp|png|jpe?g|mp4|ico)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>
+
+# --- ZIPGUARD: archives and DB dumps are never public -------------------
+# Backup archives sitting in the web root are downloadable by anyone who
+# guesses the filename, and project.zip holds .env (DB credentials, APP_KEY).
+<FilesMatch "\.(zip|tar|gz|tgz|bz2|rar|7z|sql|sql\.gz|bak|log)$">
+    Require all denied
+</FilesMatch>
+# --- end ZIPGUARD ------------------------------------------------------
+
+# --- SECHEADERS ---------------------------------------------------------
+# The site sent no security headers at all. These four are safe for a
+# static site: none of them alter how the pages render.
+# Deliberately NOT set here: Strict-Transport-Security (a lasting
+# commitment -- browsers cache it, so a lapsed cert would lock visitors
+# out) and Content-Security-Policy (the pages rely on inline <script>,
+# so a policy needs auditing before it can be enforced).
+<IfModule mod_headers.c>
+    # Stop browsers guessing a MIME type other than the one we send.
+    Header always set X-Content-Type-Options "nosniff"
+    # Block framing by other origins (clickjacking).
+    Header always set X-Frame-Options "SAMEORIGIN"
+    # Send the origin, never the full path, on cross-origin navigation.
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    # No page here uses these device APIs, so deny them outright.
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+</IfModule>
+# --- end SECHEADERS -----------------------------------------------------

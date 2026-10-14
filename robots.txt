@@ -1,0 +1,29 @@
+User-agent: *
+Allow: /
+
+# Form handler. It only answers POST and returns JSON, so there is nothing
+# for a crawler to index here.
+Disallow: /send.php
+
+# AI crawlers are allowed deliberately, not by omission. Being cited in AI
+# answers is a discovery channel we want, and the blog is written to be
+# quotable. Listing them explicitly documents that as a decision.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+Sitemap: https://afmdevelopments.com/sitemap.xml
