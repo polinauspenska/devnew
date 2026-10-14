@@ -1430,5 +1430,50 @@
 } catch(e){ console.error('AFM footer error:', e); } })();
 </script>
 <script src="assets/js/interest-form.js"></script>
+<script>
+/* GitHub Pages path fix. The site's clean URLs (/about-us, /projects ...) are
+   served by .htaccess on the real host. GitHub Pages ignores .htaccess and
+   serves this repo under /<repo>/, so on *.github.io only, point root links
+   and media at the matching flat .html files. No-op on afmdevelopments.com. */
+(function () {
+  if (!/\.github\.io$/.test(location.hostname)) return;
+  var seg = location.pathname.split('/')[1] || '';
+  var BASE = seg && seg.indexOf('.') === -1 ? '/' + seg : '';
+  var ROUTES = {
+    'about-us': 'about.html', 'projects/bonito': 'bonito.html',
+    'projects/township': 'township.html', 'projects': 'projects.html',
+    'blogs': 'blogs.html', 'contact': 'contact.html', 'broker': 'broker.html',
+    'book-meeting': 'book-meeting.html', 'privacy-policy': 'privacy-policy.html',
+    'terms-and-conditions': 'terms-and-conditions.html'
+  };
+  function fix(url) {
+    if (!url || url.charAt(0) !== '/' || url.charAt(1) === '/') return null;
+    if (BASE && (url === BASE || url.indexOf(BASE + '/') === 0)) return null;
+    var m = url.match(/^\/([^?#]*?)\/?([?#].*)?$/);
+    var p = m ? m[1] : url.slice(1), rest = (m && m[2]) || '';
+    if (p === '') return BASE + '/' + rest;
+    return BASE + '/' + (ROUTES[p] || p) + rest;
+  }
+  function run(root) {
+    var els = root.querySelectorAll('a[href^="/"],[src^="/"],[poster^="/"],link[href^="/"]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      ['href', 'src', 'poster'].forEach(function (a) {
+        var v = el.getAttribute(a), n = fix(v);
+        if (n && n !== v) el.setAttribute(a, n);
+      });
+    }
+    var vids = root.querySelectorAll('video');
+    for (var j = 0; j < vids.length; j++) { try { vids[j].load(); } catch (e) {} }
+  }
+  run(document);
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="/"]');
+    if (!a) return;
+    var n = fix(a.getAttribute('href'));
+    if (n) { e.preventDefault(); location.href = n; }
+  }, true);
+})();
+</script>
 </body>
 </html>
